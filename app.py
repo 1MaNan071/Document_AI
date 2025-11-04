@@ -14,7 +14,7 @@ from utils import save_json, save_excel
 
 # ---------- Page config ----------
 st.set_page_config(page_title="📄 Document AI POC", layout="wide")
-st.title("📄 Document AI — Extraction POC")
+st.title("📄 Document AI — Extraction")
 
 # ---------- Sidebar controls ----------
 with st.sidebar:
