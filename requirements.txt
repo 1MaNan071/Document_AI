@@ -1,0 +1,11 @@
+streamlit
+pdfplumber
+pdf2image
+pytesseract
+pandas
+openpyxl
+langchain
+requests
+python-dotenv
+tabula-py
+camelot-py[cv]  # optional; only if you plan to use camelot
