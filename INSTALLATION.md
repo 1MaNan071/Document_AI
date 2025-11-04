@@ -66,6 +66,7 @@ Open the Local URL shown in the terminal (e.g., [http://localhost:8501](http://l
 * Ensure `POPPLER_PATH` points to the folder that contains `pdftoppm.exe` and `pdfinfo.exe`.
 * If Tesseract isn’t on PATH, set `TESSERACT_PATH` as above.
 * For scanned PDFs, enable **Force OCR** in the UI.
+* Create /outputs folder in main directory for your documents.
 
 ```
 ::contentReference[oaicite:0]{index=0}
