@@ -7,7 +7,10 @@ __pycache__/
 .venv/
 .env
 
-# Streamlit / data
+# Vercel
+.vercel/
+
+# Outputs / temp
 outputs/
 temp_uploaded.pdf
 

@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document AI — Extract structured data from PDFs</title>
+    <style>
+        /* ─── Reset & Base ────────────────────────────────────────── */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --primary-light: #e0e7ff;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text: #1e293b;
+            --text-dim: #64748b;
+            --border: #e2e8f0;
+            --success: #10b981;
+            --success-bg: #ecfdf5;
+            --warning: #f59e0b;
+            --warning-bg: #fffbeb;
+            --error: #ef4444;
+            --error-bg: #fef2f2;
+            --radius: 12px;
+            --radius-sm: 8px;
+            --shadow: 0 1px 3px rgba(0, 0, 0, .08), 0 1px 2px rgba(0, 0, 0, .04);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, .08), 0 2px 4px -2px rgba(0, 0, 0, .04);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, .08), 0 4px 6px -4px rgba(0, 0, 0, .04);
+            --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* ─── Header ──────────────────────────────────────────────── */
+        header {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%);
+            color: #fff;
+            padding: 2.5rem 1.5rem 2rem;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.35rem;
+        }
+
+        header p {
+            font-size: 1rem;
+            opacity: 0.88;
+            font-weight: 400;
+        }
+
+        .header-badge {
+            display: inline-block;
+            margin-top: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            background: rgba(255, 255, 255, 0.18);
+            border-radius: 999px;
+            font-size: 0.78rem;
+            backdrop-filter: blur(4px);
+        }
+
+        /* ─── Container ───────────────────────────────────────────── */
+        .container {
+            max-width: 860px;
+            margin: -1.5rem auto 3rem;
+            padding: 0 1rem;
+        }
+
+        /* ─── Card ────────────────────────────────────────────────── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: var(--shadow);
+        }
+
+        /* ─── Upload Zone ─────────────────────────────────────────── */
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 2.5rem 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: var(--surface);
+        }
+
+        .upload-zone:hover,
+        .upload-zone.drag-over {
+            border-color: var(--primary);
+            background: var(--primary-light);
+        }
+
+        .upload-zone svg {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 0.75rem;
+            color: var(--text-dim);
+        }
+
+        .upload-zone.drag-over svg {
+            color: var(--primary);
+        }
+
+        .upload-zone h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .upload-zone p {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
+
+        .upload-zone input[type="file"] {
+            display: none;
+        }
+
+        /* ─── File Info Bar ───────────────────────────────────────── */
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: var(--primary-light);
+            border: 1px solid #c7d2fe;
+            border-radius: var(--radius-sm);
+            margin-top: 0.75rem;
+        }
+
+        .file-info svg {
+            width: 20px;
+            height: 20px;
+            color: var(--primary);
+            flex-shrink: 0;
+        }
+
+        .file-info .name {
+            font-size: 0.88rem;
+            font-weight: 500;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-info .size {
+            font-size: 0.78rem;
+            color: var(--text-dim);
+            flex-shrink: 0;
+        }
+
+        .file-info .remove {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-dim);
+            font-size: 1.2rem;
+            line-height: 1;
+            padding: 0.2rem;
+            border-radius: 4px;
+            transition: all 0.15s;
+        }
+
+        .file-info .remove:hover {
+            color: var(--error);
+            background: var(--error-bg);
+        }
+
+        /* ─── Settings ────────────────────────────────────────────── */
+        .settings-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            padding: 0.5rem 0;
+            transition: color 0.15s;
+        }
+
+        .settings-toggle:hover {
+            color: var(--text);
+        }
+
+        .settings-toggle svg {
+            width: 16px;
+            height: 16px;
+            transition: transform 0.2s;
+        }
+
+        .settings-toggle.open svg {
+            transform: rotate(90deg);
+        }
+
+        .settings-panel {
+            display: none;
+            gap: 1rem;
+            padding-top: 0.75rem;
+        }
+
+        .settings-panel.open {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .setting-group label {
+            display: block;
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-dim);
+            margin-bottom: 0.35rem;
+        }
+
+        .setting-group input[type="range"] {
+            width: 100%;
+            accent-color: var(--primary);
+        }
+
+        .setting-group input[type="number"] {
+            width: 100%;
+            padding: 0.4rem 0.6rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-family: var(--mono);
+            font-size: 0.85rem;
+        }
+
+        .range-value {
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        /* ─── Process Button ──────────────────────────────────────── */
+        .btn-process {
+            display: block;
+            width: 100%;
+            padding: 0.85rem;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 1rem;
+        }
+
+        .btn-process:hover:not(:disabled) {
+            background: var(--primary-hover);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-process:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .btn-process.loading {
+            pointer-events: none;
+            position: relative;
+        }
+
+        /* ─── Processing Steps ────────────────────────────────────── */
+        .processing {
+            padding: 1.5rem;
+        }
+
+        .step-list {
+            list-style: none;
+        }
+
+        .step-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0;
+            font-size: 0.9rem;
+            color: var(--text-dim);
+            transition: color 0.3s;
+        }
+
+        .step-item.active {
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        .step-item.done {
+            color: var(--success);
+        }
+
+        .step-icon {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            flex-shrink: 0;
+            border: 2px solid var(--border);
+            color: var(--text-dim);
+            transition: all 0.3s;
+        }
+
+        .step-item.active .step-icon {
+            border-color: var(--primary);
+            color: var(--primary);
+            animation: pulse 1.2s infinite;
+        }
+
+        .step-item.done .step-icon {
+            border-color: var(--success);
+            background: var(--success);
+            color: #fff;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.3);
+            }
+
+            50% {
+                box-shadow: 0 0 0 6px rgba(99, 102, 241, 0);
+            }
+        }
+
+        /* ─── Error ───────────────────────────────────────────────── */
+        .error-box {
+            background: var(--error-bg);
+            border: 1px solid #fca5a5;
+            border-radius: var(--radius-sm);
+            padding: 1rem 1.25rem;
+            color: #991b1b;
+            font-size: 0.9rem;
+        }
+
+        /* ─── Results ─────────────────────────────────────────────── */
+        .results-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .results-header h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        /* Metric cards */
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .metric {
+            background: var(--bg);
+            border-radius: var(--radius-sm);
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--primary);
+            line-height: 1.2;
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-top: 0.2rem;
+        }
+
+        /* Sections */
+        .result-section {
+            margin-bottom: 1rem;
+        }
+
+        .section-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-dim);
+            margin-bottom: 0.6rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* Fields grid */
+        .fields-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 0.6rem;
+        }
+
+        .field-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 0.5rem;
+            padding: 0.65rem 0.85rem;
+            background: var(--bg);
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        .field-key {
+            font-weight: 600;
+            color: var(--text-dim);
+            word-break: break-word;
+        }
+
+        .field-val {
+            font-weight: 500;
+            text-align: right;
+            word-break: break-word;
+        }
+
+        .confidence {
+            display: inline-block;
+            font-size: 0.65rem;
+            padding: 0.1rem 0.4rem;
+            border-radius: 4px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-left: 0.3rem;
+        }
+
+        .confidence.high {
+            background: var(--success-bg);
+            color: #065f46;
+        }
+
+        .confidence.med {
+            background: var(--warning-bg);
+            color: #92400e;
+        }
+
+        .confidence.low {
+            background: var(--error-bg);
+            color: #991b1b;
+        }
+
+        /* Tables */
+        .table-wrapper {
+            overflow-x: auto;
+            margin-bottom: 0.75rem;
+        }
+
+        .table-wrapper table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+        }
+
+        .table-wrapper th {
+            background: var(--primary-light);
+            color: var(--text);
+            font-weight: 600;
+            text-align: left;
+            padding: 0.55rem 0.75rem;
+        }
+
+        .table-wrapper td {
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .table-wrapper tr:hover td {
+            background: #f8fafc;
+        }
+
+        .table-name {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            margin-bottom: 0.35rem;
+        }
+
+        /* Insights */
+        .insight-list {
+            list-style: none;
+        }
+
+        .insight-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            padding: 0.45rem 0;
+            font-size: 0.88rem;
+            line-height: 1.5;
+        }
+
+        .insight-bullet {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--primary);
+            flex-shrink: 0;
+            margin-top: 0.5rem;
+        }
+
+        /* JSON viewer */
+        .json-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+            cursor: pointer;
+            color: var(--text-dim);
+            transition: all 0.15s;
+        }
+
+        .json-toggle:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .json-viewer {
+            display: none;
+            margin-top: 0.75rem;
+            position: relative;
+        }
+
+        .json-viewer.open {
+            display: block;
+        }
+
+        .json-viewer pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.25rem;
+            border-radius: var(--radius-sm);
+            overflow-x: auto;
+            font-family: var(--mono);
+            font-size: 0.78rem;
+            line-height: 1.65;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .json-copy {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #e2e8f0;
+            border-radius: 6px;
+            padding: 0.35rem 0.7rem;
+            font-size: 0.72rem;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .json-copy:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Download button */
+        .btn-download {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.6rem 1.2rem;
+            background: var(--success);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-download:hover {
+            background: #059669;
+            box-shadow: var(--shadow-md);
+        }
+
+        /* ─── Extracted Text Preview ──────────────────────────────── */
+        .text-preview {
+            background: var(--bg);
+            border-radius: var(--radius-sm);
+            padding: 1rem;
+            font-size: 0.82rem;
+            color: var(--text-dim);
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: var(--mono);
+            line-height: 1.5;
+        }
+
+        /* ─── Footer ──────────────────────────────────────────────── */
+        footer {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+        }
+
+        footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* ─── Utilities ───────────────────────────────────────────── */
+        .hidden {
+            display: none !important;
+        }
+
+        .mt-1 {
+            margin-top: 1rem;
+        }
+
+        /* ─── Responsive ──────────────────────────────────────────── */
+        @media (max-width: 640px) {
+            header {
+                padding: 1.75rem 1rem 1.5rem;
+            }
+
+            header h1 {
+                font-size: 1.5rem;
+            }
+
+            .container {
+                padding: 0 0.75rem;
+            }
+
+            .card {
+                padding: 1rem;
+            }
+
+            .settings-panel.open {
+                grid-template-columns: 1fr;
+            }
+
+            .fields-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .metrics {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+
+    <!-- ─── Header ──────────────────────────────────── -->
+    <header>
+        <h1>Document AI</h1>
+        <p>Extract structured data from PDFs using AI</p>
+        <span class="header-badge">Powered by Groq &middot; Free tier</span>
+    </header>
+
+    <!-- ─── Main ────────────────────────────────────── -->
+    <div class="container">
+
+        <!-- Upload Card -->
+        <div class="card" id="upload-card">
+            <div class="upload-zone" id="drop-zone">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12-3-3m0 0-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                </svg>
+                <h3>Upload your PDF</h3>
+                <p>Drag & drop or click to browse &middot; Max 4.5 MB &middot; Digital PDFs only</p>
+                <input type="file" id="file-input" accept=".pdf">
+            </div>
+
+            <div class="file-info hidden" id="file-info">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                </svg>
+                <span class="name" id="file-name"></span>
+                <span class="size" id="file-size"></span>
+                <button class="remove" id="file-remove" title="Remove file">&times;</button>
+            </div>
+
+            <!-- Settings -->
+            <div class="mt-1">
+                <button class="settings-toggle" id="settings-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                    </svg>
+                    Advanced Settings
+                </button>
+                <div class="settings-panel" id="settings-panel">
+                    <div class="setting-group">
+                        <label>Temperature <span class="range-value" id="temp-val">0.0</span></label>
+                        <input type="range" id="temperature" min="0" max="1" step="0.1" value="0">
+                    </div>
+                    <div class="setting-group">
+                        <label>Max Tokens</label>
+                        <input type="number" id="max-tokens" min="256" max="4096" step="64" value="1500">
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-process" id="process-btn" disabled>Process Document</button>
+        </div>
+
+        <!-- Processing Card -->
+        <div class="card processing hidden" id="processing-card">
+            <ul class="step-list">
+                <li class="step-item" data-step="upload">
+                    <span class="step-icon">1</span>
+                    <span>Uploading PDF&hellip;</span>
+                </li>
+                <li class="step-item" data-step="text">
+                    <span class="step-icon">2</span>
+                    <span>Extracting text &amp; tables&hellip;</span>
+                </li>
+                <li class="step-item" data-step="llm">
+                    <span class="step-icon">3</span>
+                    <span>Analyzing with AI&hellip;</span>
+                </li>
+                <li class="step-item" data-step="done">
+                    <span class="step-icon">4</span>
+                    <span>Building results&hellip;</span>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Error Card -->
+        <div class="card hidden" id="error-card">
+            <div class="error-box" id="error-msg"></div>
+        </div>
+
+        <!-- Results Card -->
+        <div class="card hidden" id="results-card">
+            <div class="results-header">
+                <h2>Results</h2>
+                <button class="btn-download" id="download-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24"
+                        stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                    Download JSON
+                </button>
+            </div>
+
+            <!-- Metrics -->
+            <div class="metrics" id="metrics"></div>
+
+            <!-- Fields -->
+            <div class="result-section" id="fields-section">
+                <div class="section-title">Extracted Fields</div>
+                <div class="fields-grid" id="fields-grid"></div>
+            </div>
+
+            <!-- Tables -->
+            <div class="result-section hidden" id="tables-section">
+                <div class="section-title">Tables</div>
+                <div id="tables-container"></div>
+            </div>
+
+            <!-- Insights -->
+            <div class="result-section hidden" id="insights-section">
+                <div class="section-title">AI Insights</div>
+                <ul class="insight-list" id="insights-list"></ul>
+            </div>
+
+            <!-- Text Preview -->
+            <div class="result-section">
+                <div class="section-title">Extracted Text Preview</div>
+                <div class="text-preview" id="text-preview"></div>
+            </div>
+
+            <!-- JSON Viewer -->
+            <div class="result-section">
+                <button class="json-toggle" id="json-toggle-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24"
+                        stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" />
+                    </svg>
+                    View Raw JSON
+                </button>
+                <div class="json-viewer" id="json-viewer">
+                    <button class="json-copy" id="json-copy-btn">Copy</button>
+                    <pre id="json-content"></pre>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <footer>
+        Built with FastAPI + Groq &middot;
+        <a href="https://github.com/1MaNan071/Document_AI" target="_blank">GitHub</a>
+    </footer>
+
+    <!-- ─── Script ───────────────────────────────────── -->
+    <script>
+        const $ = (sel) => document.querySelector(sel);
+        const $$ = (sel) => document.querySelectorAll(sel);
+
+        // ── Elements ──
+        const dropZone = $('#drop-zone');
+        const fileInput = $('#file-input');
+        const fileInfo = $('#file-info');
+        const fileName = $('#file-name');
+        const fileSize = $('#file-size');
+        const fileRemove = $('#file-remove');
+        const processBtn = $('#process-btn');
+        const settingsBtn = $('#settings-btn');
+        const settingsPanel = $('#settings-panel');
+        const tempSlider = $('#temperature');
+        const tempVal = $('#temp-val');
+        const maxTokens = $('#max-tokens');
+        const processingCard = $('#processing-card');
+        const errorCard = $('#error-card');
+        const errorMsg = $('#error-msg');
+        const resultsCard = $('#results-card');
+
+        let selectedFile = null;
+        let lastResult = null;
+
+        // ── File Upload ──
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            const f = e.dataTransfer.files[0];
+            if (f && f.name.toLowerCase().endsWith('.pdf')) selectFile(f);
+        });
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files[0]) selectFile(fileInput.files[0]);
+        });
+        fileRemove.addEventListener('click', clearFile);
+
+        function selectFile(f) {
+            if (f.size > 4_500_000) {
+                alert('File too large. Maximum size is 4.5 MB.');
+                return;
+            }
+            selectedFile = f;
+            fileName.textContent = f.name;
+            fileSize.textContent = (f.size / 1024).toFixed(1) + ' KB';
+            fileInfo.classList.remove('hidden');
+            dropZone.classList.add('hidden');
+            processBtn.disabled = false;
+            errorCard.classList.add('hidden');
+            resultsCard.classList.add('hidden');
+        }
+
+        function clearFile() {
+            selectedFile = null;
+            fileInput.value = '';
+            fileInfo.classList.add('hidden');
+            dropZone.classList.remove('hidden');
+            processBtn.disabled = true;
+        }
+
+        // ── Settings ──
+        settingsBtn.addEventListener('click', () => {
+            settingsBtn.classList.toggle('open');
+            settingsPanel.classList.toggle('open');
+        });
+        tempSlider.addEventListener('input', () => {
+            tempVal.textContent = parseFloat(tempSlider.value).toFixed(1);
+        });
+
+        // ── Processing Steps ──
+        function setStep(step) {
+            const steps = ['upload', 'text', 'llm', 'done'];
+            const idx = steps.indexOf(step);
+            $$('.step-item').forEach((el, i) => {
+                el.classList.remove('active', 'done');
+                if (i < idx) el.classList.add('done');
+                else if (i === idx) el.classList.add('active');
+            });
+        }
+
+        // ── Process ──
+        processBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            // UI state
+            processBtn.disabled = true;
+            processBtn.textContent = 'Processing…';
+            processBtn.classList.add('loading');
+            errorCard.classList.add('hidden');
+            resultsCard.classList.add('hidden');
+            processingCard.classList.remove('hidden');
+
+            setStep('upload');
+
+            const form = new FormData();
+            form.append('file', selectedFile);
+            form.append('temperature', tempSlider.value);
+            form.append('max_tokens', maxTokens.value);
+
+            try {
+                setStep('text');
+
+                // Simulate step transitions with timers (actual work happens server-side)
+                const stepTimer = setTimeout(() => setStep('llm'), 2500);
+
+                const resp = await fetch('/api/extract', { method: 'POST', body: form });
+                clearTimeout(stepTimer);
+
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+                    throw new Error(err.detail || err.error || `Server error (${resp.status})`);
+                }
+
+                setStep('done');
+                const data = await resp.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Extraction failed');
+                }
+
+                lastResult = data;
+                renderResults(data);
+
+                await new Promise(r => setTimeout(r, 400));
+                processingCard.classList.add('hidden');
+                resultsCard.classList.remove('hidden');
+                resultsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            } catch (err) {
+                processingCard.classList.add('hidden');
+                errorMsg.textContent = err.message;
+                errorCard.classList.remove('hidden');
+            } finally {
+                processBtn.disabled = false;
+                processBtn.textContent = 'Process Document';
+                processBtn.classList.remove('loading');
+            }
+        });
+
+        // ── Render Results ──
+        function renderResults(data) {
+            const r = data.result || {};
+
+            // Metrics
+            const meta = r.metadata || {};
+            const fields = r.fields || {};
+            const tables = r.tables || [];
+            const insights = r.insights || [];
+
+            $('#metrics').innerHTML = `
+        <div class="metric"><div class="metric-value">${esc(meta.filename || data.heuristics?.filename || '—')}</div><div class="metric-label">Filename</div></div>
+        <div class="metric"><div class="metric-value">${data.page_count || meta.page_count || '—'}</div><div class="metric-label">Pages</div></div>
+        <div class="metric"><div class="metric-value">${Object.keys(fields).length}</div><div class="metric-label">Fields</div></div>
+        <div class="metric"><div class="metric-value">${tables.length || data.tables_found || 0}</div><div class="metric-label">Tables</div></div>
+      `;
+
+            // Fields
+            const fg = $('#fields-grid');
+            fg.innerHTML = '';
+            if (Object.keys(fields).length) {
+                Object.entries(fields).forEach(([k, v]) => {
+                    const val = typeof v === 'object' ? v.value : v;
+                    const conf = typeof v === 'object' ? v.confidence : '';
+                    const confBadge = conf ? `<span class="confidence ${conf}">${conf}</span>` : '';
+                    fg.innerHTML += `<div class="field-card"><span class="field-key">${esc(k)}</span><span class="field-val">${esc(String(val || ''))}${confBadge}</span></div>`;
+                });
+                $('#fields-section').classList.remove('hidden');
+            } else {
+                $('#fields-section').classList.add('hidden');
+            }
+
+            // Tables
+            const tc = $('#tables-container');
+            tc.innerHTML = '';
+            if (tables.length) {
+                tables.forEach((t, i) => {
+                    const cols = t.columns || [];
+                    const rows = t.rows || [];
+                    let html = `<div class="table-name">${esc(t.name || `Table ${i + 1}`)}${t.detected_type ? ` — ${esc(t.detected_type)}` : ''}</div>`;
+                    html += '<div class="table-wrapper"><table>';
+                    if (cols.length) {
+                        html += '<thead><tr>' + cols.map(c => `<th>${esc(c)}</th>`).join('') + '</tr></thead>';
+                    }
+                    html += '<tbody>';
+                    rows.slice(0, 50).forEach(row => {
+                        html += '<tr>' + row.map(c => `<td>${esc(String(c || ''))}</td>`).join('') + '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    tc.innerHTML += html;
+                });
+                $('#tables-section').classList.remove('hidden');
+            } else {
+                $('#tables-section').classList.add('hidden');
+            }
+
+            // Insights
+            const il = $('#insights-list');
+            il.innerHTML = '';
+            if (insights.length) {
+                insights.forEach(tip => {
+                    il.innerHTML += `<li class="insight-item"><span class="insight-bullet"></span><span>${esc(String(tip))}</span></li>`;
+                });
+                $('#insights-section').classList.remove('hidden');
+            } else {
+                $('#insights-section').classList.add('hidden');
+            }
+
+            // Text preview
+            $('#text-preview').textContent = data.text_preview || '(no text)';
+
+            // JSON
+            $('#json-content').textContent = JSON.stringify(r, null, 2);
+        }
+
+        // ── JSON Viewer ──
+        $('#json-toggle-btn').addEventListener('click', () => {
+            $('#json-viewer').classList.toggle('open');
+        });
+        $('#json-copy-btn').addEventListener('click', () => {
+            navigator.clipboard.writeText($('#json-content').textContent);
+            const btn = $('#json-copy-btn');
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = 'Copy', 1500);
+        });
+
+        // ── Download ──
+        $('#download-btn').addEventListener('click', () => {
+            if (!lastResult) return;
+            const blob = new Blob([JSON.stringify(lastResult.result, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'document_ai_output.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        // ── Escape HTML ──
+        function esc(s) {
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+    </script>
+</body>
+
+</html>

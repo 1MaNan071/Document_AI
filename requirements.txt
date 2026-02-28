@@ -1,11 +1,6 @@
-streamlit
+fastapi
+python-multipart
+uvicorn
 pdfplumber
-pdf2image
-pytesseract
-pandas
-openpyxl
-langchain
-requests
+httpx
 python-dotenv
-tabula-py
-camelot-py[cv]  # optional; only if you plan to use camelot
