@@ -3,10 +3,8 @@
 A production-ready Document AI pipeline that extracts text, tables, and structured data from PDFs using AI. Deployed as a serverless app on **Vercel** with a clean web UI.
 
 ## Live Demo
+demo  [click](https://docai-beryl.vercel.app)
 
-Deploy your own instance in one click:
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2F1MaNan071%2FDocument_AI&env=GROQ_API_KEY,GROQ_MODEL&envDescription=Get%20a%20free%20Groq%20API%20key%20at%20console.groq.com&envLink=https%3A%2F%2Fconsole.groq.com)
 
 ## Features
 
