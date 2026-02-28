@@ -307,8 +307,8 @@ async def extract_document(
         os.unlink(tmp.name)
 
 
-# ─── Static files (local dev only — Vercel serves /public automatically) ─────
+# ─── Static files (local dev only — Vercel serves root-level files automatically)
 
-_public = Path(__file__).resolve().parent.parent / "public"
-if _public.is_dir():
-    app.mount("/", StaticFiles(directory=str(_public), html=True), name="static")
+_root = Path(__file__).resolve().parent.parent
+if (_root / "index.html").is_file():
+    app.mount("/", StaticFiles(directory=str(_root), html=True), name="static")
